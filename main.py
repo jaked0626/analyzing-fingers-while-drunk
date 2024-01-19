@@ -25,7 +25,15 @@ class Player:
         return self.plays[random.randint(0, len(self.plays) - 1)]
 
     def guess(self, num_players: int) -> int:
-        """Guess always happens after hand generation"""
+        """Guess always happens after hand generation. Guesses randomly"""
+        others_hands = sum([self.random_hand() for _ in range(num_players - 1)])
+        self.current_guess = self.current_hand + others_hands
+        return self.current_guess
+    
+    def guess_rational(self, num_players: int) -> int:
+        """Guess always happens after hand generation. Always guesses the expected value"""
+        # if the number of players is odd, we don't want to say a nonsensical decimal value. 
+        self.current_guess = 2.5 * (num_players - 1) + ((num_players - 1) % 2) * 2.5
         others_hands = sum([self.random_hand() for _ in range(num_players - 1)])
         self.current_guess = self.current_hand + others_hands
         return self.current_guess
@@ -45,13 +53,16 @@ class Game:
     def __post_init__(self) -> None:
         self.alive_players = self.players[:]
 
-    def round(self) -> None:
+    def round(self, rational: bool = False) -> None:
         guesser = self.alive_players[self.next_player]
         sum_hands = 0
         for player in self.alive_players:
             sum_hands += player.generate_hand()
         
-        guess = guesser.guess(len(self.alive_players))
+        if rational: 
+            guess = guesser.guess_rational(len(self.alive_players))
+        else:
+            guess = guesser.guess(len(self.alive_players))
 
         if guess == sum_hands:
             guesser.win(self.next_winner)
@@ -74,26 +85,29 @@ class Game:
         return self.is_done
     
 
-def play_game(players: list[Player]) -> Game:
+def play_game(players: list[Player], rational: bool = False) -> Game:
     g = Game(players=players)
     while not g.is_done:
-        g.round()
+        g.round(rational)
     return g
 
-def simulate(num_simulations: int) -> list[Player]:
+def simulate(num_simulations: int, rational: bool = False) -> list[Player]:
     players = []
     for i in range(NUM_STARTING_PLAYERS):
         p = Player(id = i + 1)
         players.append(p)
     for _ in range(num_simulations):
-        g = play_game(players)
+        g = play_game(players, rational)
         # print(g.record)
 
     return players
 
 
 def main() -> pd.DataFrame:
-    player_states = simulate(10000)
+    player_states = simulate(
+        num_simulations=1000,
+        rational=True,
+    )
     first_place = [player.record.get(1, 0) for player in player_states]
     second_place = [player.record.get(2, 0) for player in player_states]
     third_place = [player.record.get(3, 0) for player in player_states]
